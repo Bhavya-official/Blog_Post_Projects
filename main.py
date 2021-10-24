@@ -11,20 +11,23 @@ from flask_gravatar import Gravatar
 from functools import wraps
 import os
 
+##CONFIGURE TABLES
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get("SECRET_KEY")
 ckeditor = CKEditor(app)
 Bootstrap(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+logged_in = False
+
 
 ##CONNECT TO DB
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get("DATABASE_URL")
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-login_manager = LoginManager()
-login_manager.init_app(app)
-logged_in = False
-##CONFIGURE TABLES
 
+
+#using gravatar
 gravatar = Gravatar(app,
                     size=100,
                     rating='g',
@@ -35,6 +38,7 @@ gravatar = Gravatar(app,
                     base_url=None)
 
 
+#blog_posts table
 class BlogPost(db.Model, UserMixin):
     __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
@@ -47,6 +51,8 @@ class BlogPost(db.Model, UserMixin):
     img_url = db.Column(db.String(250), nullable=False)
     comments = relationship("Comment", back_populates="post")
 
+
+#users table
 class User(db.Model, UserMixin):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +62,8 @@ class User(db.Model, UserMixin):
     blog_posts = relationship("BlogPost", back_populates="author")
     comments = relationship("Comment", back_populates="author")
 
+
+#comments table
 class Comment(db.Model):
     __tablename__="comments"
     id = db.Column(db.Integer, primary_key=True)
@@ -65,6 +73,8 @@ class Comment(db.Model):
     post_id = db.Column(db.Integer, db.ForeignKey("blog_posts.id"), nullable=False)
     post = relationship("BlogPost", back_populates="comments")
 
+
+# Python decorator to access path only by admin
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -75,19 +85,17 @@ def admin_only(f):
         return f(*args, **kwargs)
     return decorated_function
 
+#ceate Database
 db.create_all()
-# postoo = BlogPost(author_id=1,title="The Life of Cactus",subtitle="Who knew that cacti lived such interesting lives.",date="October 20, 2020",
-#                 body="<p>Nori grape silver beet broccoli kombu beet greens fava bean potato quandong celery.</p><p>Bunya nuts black-eyed pea prairie turnip leek lentil turnip greens parsnip.</p><p>Sea lettuce lettuce water chestnut eggplant winter purslane fennel azuki bean earthnut pea sierra leone bologi leek soko chicory celtuce parsley j&iacute;cama salsify.</p>",
-#                 img_url="https://images.unsplash.com/photo-1530482054429-cc491f61333b?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1651&q=80")
-# # ..........................................................................
-# db.session.add(postoo)
-# db.session.commit()
 
+
+#load user by its id
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(user_id)
 
 
+#home page that shows all posts
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
@@ -95,6 +103,7 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts, user_id=getattr(current_user, "id", None), logged_in=logged_in)
 
 
+#Regiser page
 @app.route('/register', methods=["GET", "POST"])
 def register():
     form = RegisterForm()
@@ -119,6 +128,7 @@ def register():
     return render_template("register.html", form=form)
 
 
+#login page
 @app.route('/login', methods=["GET", "POST"])
 def login():
     form = LoginForm()
@@ -139,6 +149,7 @@ def login():
     return render_template("login.html", form=form)
 
 
+#logout user session and redirect to home page
 @app.route('/logout')
 def logout():
     if current_user.__dict__:
@@ -147,6 +158,8 @@ def logout():
         logged_in = False
     return redirect(url_for('get_all_posts'))
 
+
+#page to show only particular post
 @app.route("/post/<int:post_id>", methods=["GET","POST"])
 def show_post(post_id):
     form = CommentForm()
@@ -165,17 +178,19 @@ def show_post(post_id):
     return render_template("post.html", form=form, post=requested_post, logged_in=logged_in, user_id=current_user.id)
 
 
+#About page
 @app.route("/about")
 def about():
     return render_template("about.html")
 
 
+#Contact page
 @app.route("/contact")
-@login_required
 def contact():
     return render_template("contact.html")
 
 
+#add post and redirect to home page
 @app.route("/new-post", methods=['GET', 'POST'])
 @admin_only
 def add_new_post():
@@ -195,6 +210,7 @@ def add_new_post():
     return render_template("make-post.html", form=form, is_edit=False)
 
 
+#edit post but only admin can edit it
 @app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 @admin_only
 def edit_post(post_id):
@@ -217,14 +233,15 @@ def edit_post(post_id):
 
     return render_template("make-post.html", form=edit_form, user_id=current_user.id, is_edit=True, logged_in=logged_in)
 
-
+#delete post and redirect to home but only admin can
 @app.route("/delete/<int:post_id>")
+@admin_only
 def delete_post(post_id):
     post_to_delete = BlogPost.query.get(post_id)
     db.session.delete(post_to_delete)
     db.session.commit()
     return redirect(url_for("get_all_posts"))
 
-
+#run our app
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000, debug=True)
