@@ -99,7 +99,6 @@ def load_user(user_id):
 @app.route('/')
 def get_all_posts():
     posts = BlogPost.query.all()
-    print(posts[0].__dict__)
     return render_template("index.html", all_posts=posts, user_id=getattr(current_user, "id", None), logged_in=logged_in)
 
 
