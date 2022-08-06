@@ -179,7 +179,7 @@ def show_post(post_id):
             db.session.commit()
         else:
             flash("For Comment you need to Register or Login ")
-    return render_template("post.html", form=form, post=requested_post, logged_in=logged_in, user_id=getattr(current_user, "id", None)
+    return render_template("post.html", form=form, post=requested_post, logged_in=logged_in, user_id=getattr(current_user, "id", None))
 
 
 #About page
